@@ -1,6 +1,8 @@
 require('dotenv').config();
 require('express-async-errors');
 
+const path = require('path');
+const fs = require('fs');
 const express = require('express');
 const cors = require('cors');
 const morgan = require('morgan');
@@ -28,7 +30,23 @@ app.use('/api/tasks', taskRoutes);
 app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/users', userRoutes);
 
-app.use((req, res) => res.status(404).json({ message: 'Route not found' }));
+const frontendDist = path.resolve(__dirname, '../frontend/dist');
+const serveFrontend = fs.existsSync(frontendDist);
+
+if (serveFrontend) {
+  app.use(express.static(frontendDist));
+}
+
+app.use((req, res, next) => {
+  if (req.path.startsWith('/api/')) {
+    return res.status(404).json({ message: 'Route not found' });
+  }
+  if (serveFrontend) {
+    return res.sendFile(path.join(frontendDist, 'index.html'));
+  }
+  return next();
+});
+
 app.use(errorHandler);
 
 const PORT = process.env.PORT || 5000;

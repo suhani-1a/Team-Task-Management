@@ -1,0 +1,17 @@
+{
+  "name": "team-task-manager-monorepo",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Team Task Manager - monorepo deploy entrypoint",
+  "workspaces": [
+    "backend",
+    "frontend"
+  ],
+  "scripts": {
+    "build": "npm install --include=dev && npm run build --workspace frontend",
+    "start": "npm start --workspace backend"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
