@@ -10,9 +10,15 @@ const projectSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
+function refId(ref) {
+  if (!ref) return null;
+  return ref._id ? String(ref._id) : String(ref);
+}
+
 projectSchema.methods.hasAccess = function (userId) {
   const id = String(userId);
-  return String(this.owner) === id || this.members.some((m) => String(m) === id);
+  if (refId(this.owner) === id) return true;
+  return (this.members || []).some((m) => refId(m) === id);
 };
 
 module.exports = mongoose.model('Project', projectSchema);
