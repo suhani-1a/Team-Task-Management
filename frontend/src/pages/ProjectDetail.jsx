@@ -30,7 +30,8 @@ export default function ProjectDetail() {
 
   const [memberOpen, setMemberOpen] = useState(false);
   const [memberQuery, setMemberQuery] = useState('');
-  const [memberResults, setMemberResults] = useState([]);
+  const [allUsers, setAllUsers] = useState([]);
+  const [loadingUsers, setLoadingUsers] = useState(false);
 
   const isOwner = useMemo(
     () => project && user && String(project.owner?._id || project.owner) === String(user.id),
@@ -123,16 +124,29 @@ export default function ProjectDetail() {
     }
   };
 
-  const searchUsers = async (q) => {
-    setMemberQuery(q);
-    if (!q) return setMemberResults([]);
-    const { data } = await api.get(`/users?q=${encodeURIComponent(q)}`);
+  useEffect(() => {
+    if (!memberOpen) return;
+    setLoadingUsers(true);
+    api
+      .get('/users')
+      .then(({ data }) => setAllUsers(data))
+      .catch(() => setAllUsers([]))
+      .finally(() => setLoadingUsers(false));
+  }, [memberOpen]);
+
+  const addableUsers = useMemo(() => {
+    if (!project) return [];
     const existing = new Set([
-      String(project.owner?._id),
-      ...(project.members || []).map((m) => String(m._id)),
+      String(project.owner?._id || project.owner),
+      ...(project.members || []).map((m) => String(m._id || m)),
     ]);
-    setMemberResults(data.filter((u) => !existing.has(String(u._id))));
-  };
+    const q = memberQuery.trim().toLowerCase();
+    return allUsers
+      .filter((u) => !existing.has(String(u._id)))
+      .filter(
+        (u) => !q || u.name.toLowerCase().includes(q) || u.email.toLowerCase().includes(q)
+      );
+  }, [allUsers, memberQuery, project]);
 
   const addMember = async (userId) => {
     try {
@@ -140,7 +154,6 @@ export default function ProjectDetail() {
       const { data } = await api.put(`/projects/${id}`, { members: ids });
       setProject(data);
       setMemberQuery('');
-      setMemberResults([]);
     } catch (e) {
       setError(e.response?.data?.message || 'Failed to add member');
     }
@@ -300,28 +313,39 @@ export default function ProjectDetail() {
       >
         <div className="space-y-4">
           <div>
-            <label className="label">Search users by name or email</label>
+            <label className="label">Add members</label>
             <input
               className="input"
               value={memberQuery}
-              onChange={(e) => searchUsers(e.target.value)}
-              placeholder="Type to search…"
+              onChange={(e) => setMemberQuery(e.target.value)}
+              placeholder="Filter by name or email (optional)"
             />
-            {memberResults.length > 0 && (
-              <ul className="mt-2 max-h-40 divide-y divide-slate-100 overflow-auto rounded-md border border-slate-200">
-                {memberResults.map((u) => (
-                  <li key={u._id} className="flex items-center justify-between px-3 py-2">
+            <div className="mt-2 max-h-56 divide-y divide-slate-100 overflow-auto rounded-md border border-slate-200">
+              {loadingUsers ? (
+                <p className="px-3 py-2 text-sm text-slate-500">Loading users…</p>
+              ) : addableUsers.length === 0 ? (
+                <p className="px-3 py-2 text-sm text-slate-500">
+                  {allUsers.length === 0
+                    ? 'No users in the system yet.'
+                    : 'No users left to add.'}
+                </p>
+              ) : (
+                addableUsers.map((u) => (
+                  <div key={u._id} className="flex items-center justify-between px-3 py-2">
                     <div className="text-sm">
-                      <div className="font-medium">{u.name}</div>
+                      <div className="font-medium">
+                        {u.name}{' '}
+                        <span className="text-xs font-normal text-slate-400">({u.role})</span>
+                      </div>
                       <div className="text-xs text-slate-500">{u.email}</div>
                     </div>
                     <button className="btn-ghost text-xs" onClick={() => addMember(u._id)}>
                       Add
                     </button>
-                  </li>
-                ))}
-              </ul>
-            )}
+                  </div>
+                ))
+              )}
+            </div>
           </div>
           <div>
             <h4 className="mb-2 text-sm font-semibold text-slate-700">Current members</h4>
